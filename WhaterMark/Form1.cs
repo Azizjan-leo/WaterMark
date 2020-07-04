@@ -4,8 +4,10 @@ using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security.Permissions;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -29,6 +31,57 @@ namespace WhaterMark
             
             fontsCbx.Items.AddRange(FontFamily.Families.Select(x => x.Name).ToArray());
             
+        }
+
+        private void saveBtn_Click(object sender, EventArgs e)
+        {
+            var saveFileDialog = new SaveFileDialog
+            {
+                Filter = "JPeg Image|*.jpg|Bitmap Image|*.bmp|Gif Image|*.gif|Png Image|*.png",
+                Title = "Save an Image File",
+                FileName = imageNameLbl.Text
+            };
+            saveFileDialog.ShowDialog();
+            // If the file name is not an empty string open it for saving.
+            if (!String.IsNullOrEmpty(saveFileDialog.FileName))
+            {
+                using (var bmp = new Bitmap(image))
+                {
+                    // Пользователь пытается сохранить картинку под тем же именем туда же
+                    if (saveFileDialog.FileName == filePath)
+                    {
+                        var dialogResult = MessageBox.Show("Please, enter new name of choose different location", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        if (dialogResult == DialogResult.OK)
+                        {
+                            saveBtn_Click(sender, e);
+                            return;
+                        }
+
+                    }
+
+                    // Удалить файл, если такой уже имеется
+                    if (File.Exists(saveFileDialog.FileName))
+                    {
+                        File.Delete(saveFileDialog.FileName);
+                    }
+
+                    switch (saveFileDialog.FilterIndex)
+                    {
+                        case 0:
+                            bmp.Save(saveFileDialog.FileName, ImageFormat.Jpeg);
+                            break;
+                        case 1:
+                            bmp.Save(saveFileDialog.FileName, ImageFormat.Bmp);
+                            break;
+                        case 2:
+                            bmp.Save(saveFileDialog.FileName, ImageFormat.Gif);
+                            break;
+                        case 3:
+                            bmp.Save(saveFileDialog.FileName, ImageFormat.Png);
+                            break;
+                    }
+                }
+            }
         }
 
         private void chooseImgBtn_Click(object sender, EventArgs e)
@@ -171,11 +224,6 @@ namespace WhaterMark
             // Update the text box color if the user clicks OK 
             if (colorDialog1.ShowDialog() == DialogResult.OK)
                 colorBtn.BackColor = colorDialog1.Color;
-        }
-
-        private void saveBtn_Click(object sender, EventArgs e)
-        {
-            image.Save("dfdf.jpg", ImageFormat.Jpeg);
         }
     }
 }
