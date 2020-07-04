@@ -1,22 +1,22 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using System.Windows.Media.Imaging;
 using Microsoft.WindowsAPICodePack.Dialogs;
 
 namespace WhaterMark
 {
     public partial class Form1 : Form
     {
-        Bitmap image;
         Font waterMarkFont;
         float fontSize = 8.0f;
         float fontSizeShift = 0.0f;
         string filePath;
-        Color waterMarkColor;
 
         /// <summary>
         /// Конструктор класса формы
@@ -51,20 +51,8 @@ namespace WhaterMark
             // If the file name is not an empty string open it for saving.
             if (!String.IsNullOrEmpty(saveFileDialog.FileName))
             {
-                using (var bmp = new Bitmap(image))
+                using (var bmp = new Bitmap(pictureBox1.Image))
                 {
-                    // Пользователь пытается сохранить картинку под тем же именем туда же
-                    if (saveFileDialog.FileName == filePath)
-                    {
-                        var dialogResult = MessageBox.Show("Please, enter new name of choose different location", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        if (dialogResult == DialogResult.OK)
-                        {
-                            SaveBtn_Click(sender, e);
-                            return;
-                        }
-
-                    }
-
                     // Удалить файл, если такой уже имеется
                     if (File.Exists(saveFileDialog.FileName))
                     {
@@ -129,13 +117,15 @@ namespace WhaterMark
             if (open.ShowDialog() == DialogResult.OK)
             {
                 // Вносим в нашу переменную для работы с изображением выбранный рисунок
-                image = new Bitmap(open.FileName);
+                var image = new Bitmap(open.FileName);
                 // Вносим в соответствующую надпись на форме имя файла без пути
                 imageNameLbl.Text = open.SafeFileName;
                 // Показываем изображение на пикчербоксе
                 pictureBox1.Image = image;
                 // Запоминаем путь к выбранному изображению
                 filePath = open.FileName;
+                // Обновляем изображение в пикчербоксе
+                pictureBox1.Image = SetWaterMartk(filePath);
             }
         }
 
@@ -147,6 +137,7 @@ namespace WhaterMark
         private void SetBtn_Click(object sender, EventArgs e)
         {
             // Если ничего не выбрано
+            var image = pictureBox1.Image;
             if(image == null && String.IsNullOrEmpty(folderNameLbl.Text))
             {
                 var dialogResult = MessageBox.Show("Please, choose an image or a folder", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -156,29 +147,47 @@ namespace WhaterMark
             // Если изображение выбрано
             if (image != null)
             {
-                // Позиция ватермарки (берется из ползунков)
-                PointF waterMarkLocation = new PointF(horizontalTrBar.Value, verticalTrBar.Value);
-
-                string waterMarkText = waterMarkTextTxt.Text;
-
-                waterMarkFont = new Font(fontsCbx.Text, fontSize);
-
-                using (Graphics graphics = Graphics.FromImage(image))
-                {
-                    // Пишем строку
-                    graphics.DrawString(waterMarkText, waterMarkFont, new SolidBrush(waterMarkColor), waterMarkLocation);
-                }
-                pictureBox1.Image = image;
+                //Обновляем пикчербокс
+                pictureBox1.Image = SetWaterMartk(filePath);
                 saveBtn.Enabled = true;
             }
 
             // Если папка выбрана
             if (!String.IsNullOrEmpty(folderNameLbl.Text))
             {
-                foreach (var imgPath in Directory.EnumerateFiles(folderNameLbl.Text, "*.*", SearchOption.AllDirectories)
+                foreach (var imgPath in Directory.GetFiles(folderNameLbl.Text, "*.*", SearchOption.AllDirectories)
                     .Where(s => s.EndsWith(".png") || s.EndsWith(".jpg") || s.EndsWith(".jpeg") || s.EndsWith(".gif")))
                 {
-                    //SetWaterMartk(imgPath);
+                    try
+                    {
+                        var img = SetWaterMartk(imgPath);
+                        File.Delete(imgPath);
+                        switch (Path.GetExtension(imgPath))
+                        {
+                            case ".png":
+                                img.Save(imgPath, ImageFormat.Png);
+                                break;
+                            case ".jpg":
+                                img.Save(imgPath, ImageFormat.Jpeg);
+                                break;
+                            case ".jpeg":
+                                img.Save(imgPath, ImageFormat.Jpeg);
+                                break;
+                            case ".gif":
+                                img.Save(imgPath, ImageFormat.Gif);
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+
+                    }
+                }
+                { 
+                   
+                    
                 }
             }
         }
@@ -189,7 +198,24 @@ namespace WhaterMark
         /// <param name="image"></param>
         private Bitmap SetWaterMartk(string imgPath)
         {
-            var img = new Bitmap(imgPath);
+            var bitmapImage = new BitmapImage();
+            using (var stream = File.OpenRead(imgPath))
+            {
+                bitmapImage.BeginInit();
+                bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+                bitmapImage.StreamSource = stream;
+                bitmapImage.EndInit();
+            }
+            Bitmap img = null;
+            using (MemoryStream outStream = new MemoryStream())
+            {
+                BitmapEncoder enc = new BmpBitmapEncoder();
+                enc.Frames.Add(BitmapFrame.Create(bitmapImage));
+                enc.Save(outStream);
+                Bitmap bitmap = new Bitmap(outStream);
+
+                img = new Bitmap(bitmap);
+            }
             // Позиция ватермарки (берется из ползунков)
             PointF waterMarkLocation = new PointF(horizontalTrBar.Value, verticalTrBar.Value);
 
@@ -200,7 +226,7 @@ namespace WhaterMark
             using (Graphics graphics = Graphics.FromImage(img))
             {
                 // Пишем строку
-                graphics.DrawString(waterMarkText, waterMarkFont, new SolidBrush(waterMarkColor), waterMarkLocation);
+                graphics.DrawString(waterMarkText, waterMarkFont, new SolidBrush(colorBtn.BackColor), waterMarkLocation);
             }
 
             return img;
@@ -218,7 +244,11 @@ namespace WhaterMark
             {
                 // Запрещаем кнопке установки надписи взаимодействовать (клик)
                 setBtn.Enabled = false;
+                return;
             }
+            // Обновляем изображение в пикчербоксе
+            if (!String.IsNullOrEmpty(filePath))
+                pictureBox1.Image = SetWaterMartk(filePath);
         }
 
         /// <summary>
@@ -235,6 +265,8 @@ namespace WhaterMark
                 waterMarkTextTxt.Font = new Font(fontsCbx.Text, fontSize);
                 // Делаем кнопку установки надписи открытой для взаимодействаия (клик)
                 setBtn.Enabled = true;
+                // Обновляем изображение в пикчербоксе
+                pictureBox1.Image = SetWaterMartk(filePath);
             }
         }
 
@@ -267,6 +299,8 @@ namespace WhaterMark
             fontSize = (Single)Math.Round(fontSize, 2);
             // Вбиваем значение переменной в текстбокс
             fontSizeTxt.Text = fontSize.ToString();
+            // Обновляем изображение в пикчербоксе
+            pictureBox1.Image = SetWaterMartk(filePath);
         }
 
         /// <summary>
@@ -309,6 +343,8 @@ namespace WhaterMark
             fontSize = (Single)Math.Round(fontSize, 2);
             // Вбиваем значение переменной в текстбокс
             fontSizeTxt.Text = fontSize.ToString();
+            // Обновляем изображение в пикчербоксе
+            pictureBox1.Image = SetWaterMartk(filePath);
         }
 
         /// <summary>
@@ -371,6 +407,7 @@ namespace WhaterMark
         private void HorizontalTrBar_Scroll(object sender, EventArgs e)
         {
             waterMarkLocationLbl.Text = "WaterMark location: " + (sender as TrackBar).Value + ", " + verticalTrBar.Value;
+            pictureBox1.Image = SetWaterMartk(filePath);
         }
 
         /// <summary>
@@ -382,6 +419,7 @@ namespace WhaterMark
         private void VerticalTrBar_Scroll(object sender, EventArgs e)
         {
             waterMarkLocationLbl.Text = "WaterMark location: " + horizontalTrBar.Value + ", " + (sender as TrackBar).Value;
+            pictureBox1.Image = SetWaterMartk(filePath);
         }
 
         /// <summary>
@@ -400,7 +438,15 @@ namespace WhaterMark
 
             // Update the text box color if the user clicks OK 
             if (colorDialog1.ShowDialog() == DialogResult.OK)
-                waterMarkColor = colorBtn.BackColor = colorDialog1.Color;
+            {
+                colorBtn.BackColor = colorDialog1.Color;
+                pictureBox1.Image = SetWaterMartk(filePath);
+            }                
+        }
+
+        private void waterMarkTextTxt_KeyUp(object sender, KeyEventArgs e)
+        {
+
         }
     }
 }

@@ -135,7 +135,7 @@
             // 
             // fontSizeChangeTimer
             // 
-            this.fontSizeChangeTimer.Interval = 200;
+            this.fontSizeChangeTimer.Interval = 40;
             // 
             // label3
             // 
