@@ -80,6 +80,9 @@ namespace WhaterMark
                             bmp.Save(saveFileDialog.FileName, ImageFormat.Png);
                             break;
                     }
+
+                    // Скажем пользователю, что сохранение прошло успешно :)
+                    MessageBox.Show("Image saved successfuly", "Success!", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
                 }
             }
         }
